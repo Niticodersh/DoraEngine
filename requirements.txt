@@ -41,8 +41,8 @@ jsonpickle==4.1.1
 jsonpointer==3.1.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
-langchain-core==0.3.25
-langgraph==0.2.55
+langchain-core
+langgraph
 langgraph-checkpoint==2.1.2
 langgraph-prebuilt==1.0.9
 langgraph-sdk==0.1.74
