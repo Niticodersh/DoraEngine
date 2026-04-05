@@ -55,7 +55,6 @@ sentence_transformers/
 
 # ─── LangGraph / pipeline artifacts ───────────────────
 *.json
-*.txt
 
 # (optional: comment this if you WANT to track outputs)
 # outputs/
