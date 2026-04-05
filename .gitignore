@@ -1,0 +1,81 @@
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ─── Environment variables ────────────────────────────
+.env
+.env.*
+*.env
+
+# ─── Streamlit ────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ─── Logs & runtime files ─────────────────────────────
+*.log
+logs/
+*.out
+*.err
+
+# ─── OS files ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDEs & editors ───────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Jupyter / notebooks ──────────────────────────────
+.ipynb_checkpoints/
+
+# ─── Build / dist ─────────────────────────────────────
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ─── Cache (important for your setup) ─────────────────
+.cache/
+.huggingface/
+transformers_cache/
+sentence_transformers/
+*.pt
+*.bin
+
+# ─── LangGraph / pipeline artifacts ───────────────────
+*.json
+*.txt
+
+# (optional: comment this if you WANT to track outputs)
+# outputs/
+# artifacts/
+
+# ─── PDFs / exports ───────────────────────────────────
+*.pdf
+
+# ─── Temporary files ──────────────────────────────────
+tmp/
+temp/
+*.tmp
+
+# ─── Node (if any frontend added later) ───────────────
+node_modules/
+npm-debug.log*
+
+# ─── Coverage / testing ───────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ─── SQLite / DB files ────────────────────────────────
+*.db
+*.sqlite3
