@@ -22,8 +22,8 @@ from agents.graph_builder import GraphState
 load_env = __import__("dotenv").load_dotenv
 load_env()
 
-_TOP_K    = int(os.getenv("TOP_K_NODES", "8"))
-_MAX_HOPS = int(os.getenv("MAX_HOP_DEPTH", "2"))
+_TOP_K    = 8
+_MAX_HOPS = 2
 
 
 @dataclass

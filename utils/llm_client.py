@@ -10,7 +10,10 @@ from groq import Groq, AsyncGroq
 
 load_dotenv()
 
-_GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+import streamlit as st
+
+_GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+
 _MODEL = "openai/gpt-oss-120b"
 
 

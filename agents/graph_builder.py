@@ -20,7 +20,7 @@ from utils.embedder import embed, batch_cosine_similarity
 
 load_dotenv()
 
-_SIM_THRESHOLD = float(os.getenv("GRAPH_SIMILARITY_THRESHOLD", "0.70"))
+_SIM_THRESHOLD = 0.65
 _CHUNK_SIZE    = 500
 _CHUNK_OVERLAP = 100
 

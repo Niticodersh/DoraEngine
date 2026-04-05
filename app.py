@@ -696,7 +696,7 @@ def main():
 
     # Check API key
     if clicked or (query and st.session_state.get("auto_search")):
-        if not os.getenv("GROQ_API_KEY"):
+        if not (os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")):
             st.markdown("""
             <div class="error-card">
               ⚠️ <strong>GROQ_API_KEY not set.</strong><br>
