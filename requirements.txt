@@ -46,7 +46,7 @@ langgraph
 langgraph-checkpoint==2.1.2
 langgraph-prebuilt==1.0.9
 langgraph-sdk==0.1.74
-langsmith==0.2.11
+langsmith
 lxml==6.0.2
 Markdown==3.10.2
 markdown-it-py==4.0.0
