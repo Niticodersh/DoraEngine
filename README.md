@@ -238,12 +238,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Sentence Transformers** for embeddings
 - **NetworkX** for graph operations
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/doraengine/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/doraengine/discussions)
-- **Documentation**: [Wiki](https://github.com/yourusername/doraengine/wiki)
-
 ---
 
 **Built with ❤️ using cutting-edge AI technologies**
