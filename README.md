@@ -43,10 +43,10 @@ DoraEngine is an advanced AI-powered research assistant that autonomously resear
     |
     v    
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ ReasoningAgent  │ -> │  AnswerAgent    │ -> │   Final Answer   │
+│ ReasoningAgent  │ -> │  AnswerAgent    │ -> │   Final Answer  │
 │                 │    │                 │    │                 │
-│ Thinks through  │    │ Writes answer   │    │ With citations   │
-│ the problem     │    │ with citations  │    │ and confidence   │
+│ Thinks through  │    │ Writes answer   │    │ With citations  │
+│ the problem     │    │ with citations  │    │ and confidence  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 

@@ -14,6 +14,8 @@ ENV/
 .env
 .env.*
 *.env
+# BUT allow example file
+!.env.example
 
 # ─── Streamlit ────────────────────────────────────────
 .streamlit/secrets.toml
