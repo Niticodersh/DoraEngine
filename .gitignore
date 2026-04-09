@@ -81,3 +81,5 @@ htmlcov/
 # ─── SQLite / DB files ────────────────────────────────
 *.db
 *.sqlite3
+
+implementation_plan.md
