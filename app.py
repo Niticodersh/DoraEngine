@@ -25,7 +25,6 @@ load_dotenv()
 # query submission doesn't pay a multi-second import cost (torch, transformers,
 # sentence-transformers, langgraph, etc.) before Streamlit can flush the
 # initial progress UI to the browser. Paid once at app startup instead.
-from pipeline.orchestrator import run_research  # noqa: E402
 
 def clean_text(text: str) -> str:
     import re
@@ -615,6 +614,7 @@ def render_export(result):
 
 
 def run_pipeline_with_ui(query: str) -> None:
+    from pipeline.orchestrator import run_research  # noqa: E402
     """Run the research pipeline with live progress UI.
 
     UX flow:
