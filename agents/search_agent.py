@@ -6,13 +6,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
-import streamlit as st
 from dotenv import load_dotenv
+
+from utils.config import get_secret
 
 load_dotenv()
 
 _MAX_RESULTS = 10
-_TAVILY_KEY  = os.getenv("TAVILY_API_KEY", "") or st.secrets.get("TAVILY_API_KEY")
+_TAVILY_KEY  = get_secret("TAVILY_API_KEY")
 
 
 @dataclass

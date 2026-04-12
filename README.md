@@ -90,6 +90,32 @@ DoraEngine is an advanced AI-powered research assistant that autonomously resear
    - Navigate to `http://localhost:8501`
    - Start researching!
 
+## React + API App
+
+The repo now also supports a decoupled frontend/backend setup:
+
+- `api/server.py`: FastAPI backend exposing research, follow-ups, graph, and PDF export endpoints
+- `frontend/`: React + Vite client that mirrors the Streamlit research experience
+
+### Run the backend
+
+```bash
+python -m uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Run the React frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:8000`
+
 ## 🐳 Docker Deployment
 
 ### Using Docker Compose (Recommended)
@@ -120,6 +146,8 @@ docker run -p 8501:8501 --env-file .env -v $(pwd):/app doraengine
 ```
 doraengine/
 ├── app.py                 # Main Streamlit application
+├── api/                   # FastAPI backend for decoupled frontend
+├── frontend/              # React application
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile            # Docker container definition
 ├── docker-compose.yml    # Docker Compose configuration

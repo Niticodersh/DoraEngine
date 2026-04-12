@@ -8,11 +8,11 @@ from typing import Optional
 from dotenv import load_dotenv
 from groq import Groq, AsyncGroq
 
+from utils.config import get_secret
+
 load_dotenv()
 
-import streamlit as st
-
-_GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+_GROQ_API_KEY = get_secret("GROQ_API_KEY")
 
 _MODEL = "openai/gpt-oss-120b"
 
