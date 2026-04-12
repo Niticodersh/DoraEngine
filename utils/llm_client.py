@@ -9,10 +9,9 @@ from dotenv import load_dotenv
 from groq import Groq, AsyncGroq
 
 from utils.config import get_secret
+from utils.request_context import get_groq_api_key
 
 load_dotenv()
-
-_GROQ_API_KEY = get_secret("GROQ_API_KEY")
 
 _MODEL = "openai/gpt-oss-120b"
 
@@ -21,7 +20,7 @@ class LLMClient:
     """Thin synchronous + async wrapper around the Groq client."""
 
     def __init__(self, api_key: Optional[str] = None, model: str = _MODEL):
-        key = api_key or _GROQ_API_KEY
+        key = api_key or get_groq_api_key() or get_secret("GROQ_API_KEY")
         if not key:
             raise ValueError(
                 "GROQ_API_KEY is not set. Add it to your .env file."

@@ -9,11 +9,11 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 from utils.config import get_secret
+from utils.request_context import get_tavily_api_key
 
 load_dotenv()
 
 _MAX_RESULTS = 10
-_TAVILY_KEY  = get_secret("TAVILY_API_KEY")
 
 
 @dataclass
@@ -66,12 +66,13 @@ def _ddg_search(query: str, max_results: int) -> list[SearchResult]:
 # Tavily (optional)
 # ──────────────────────────────────────────────────────────────────────
 def _tavily_search(query: str, max_results: int) -> list[SearchResult]:
-    if not _TAVILY_KEY:
+    tavily_key = get_tavily_api_key() or get_secret("TAVILY_API_KEY")
+    if not tavily_key:
         return []
     try:
         from tavily import TavilyClient
 
-        client  = TavilyClient(api_key=_TAVILY_KEY)
+        client  = TavilyClient(api_key=tavily_key)
         resp    = client.search(query, max_results=max_results)
         results = []
         for r in resp.get("results", []):

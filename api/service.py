@@ -7,6 +7,7 @@ import re
 from api.constants import AGENT_STAGES
 from api.serializers import serialize_result
 from pipeline.orchestrator import run_research
+from utils.request_context import request_config
 
 
 def clean_text(text: str) -> str:
@@ -24,7 +25,11 @@ def require_query(query: str) -> str:
     return normalized
 
 
-def ensure_api_key() -> None:
+def ensure_api_key(groq_api_key: str | None = None, requires_user_key: bool = False) -> None:
+    if groq_api_key:
+        return
+    if requires_user_key:
+        raise RuntimeError("Your current plan requires adding a GROQ API key in profile before running research")
     if os.getenv("GROQ_API_KEY"):
         return
 
@@ -96,12 +101,20 @@ def stage_payload(agent: str) -> dict | None:
     return None
 
 
-def run_research_payload(query: str, progress_callback=None) -> dict:
+def run_research_payload(
+    query: str,
+    progress_callback=None,
+    groq_api_key: str | None = None,
+    tavily_api_key: str | None = None,
+    requires_user_key: bool = False,
+) -> dict:
     normalized_query = require_query(query)
-    ensure_api_key()
+    ensure_api_key(groq_api_key=groq_api_key, requires_user_key=requires_user_key)
 
-    result = run_research(normalized_query, progress_callback=progress_callback)
+    with request_config(groq_api_key=groq_api_key, tavily_api_key=tavily_api_key):
+        result = run_research(normalized_query, progress_callback=progress_callback)
     followups = []
     if result.success and result.final_answer:
-        followups = generate_followup_questions(normalized_query, result.final_answer.answer)
+        with request_config(groq_api_key=groq_api_key, tavily_api_key=tavily_api_key):
+            followups = generate_followup_questions(normalized_query, result.final_answer.answer)
     return serialize_result(result, followups)

@@ -96,11 +96,23 @@ The repo now also supports a decoupled frontend/backend setup:
 
 - `api/server.py`: FastAPI backend exposing research, follow-ups, graph, and PDF export endpoints
 - `frontend/`: React + Vite client that mirrors the Streamlit research experience
+- MongoDB-backed auth, plans, profile API keys, and saved chat history
+- PDF and Word export with free-plan watermarking
 
 ### Run the backend
 
 ```bash
 python -m uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
+```
+
+Before starting the backend, set these in `.env`:
+
+```bash
+GROQ_API_KEY=...
+AUTH_SECRET_KEY=...
+MONGODB_URI=...
+MONGODB_DB_NAME=doraengine
+TAVILY_API_KEY=... # optional
 ```
 
 ### Run the React frontend
