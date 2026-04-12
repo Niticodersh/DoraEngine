@@ -113,6 +113,17 @@ def _build_styles() -> dict:
             textColor=colors.HexColor("#4B5563"),
             spaceAfter=8,
         ),
+        "reference": ParagraphStyle(
+            "PaperReference",
+            parent=base["BodyText"],
+            fontName=_FONT_REGULAR,
+            fontSize=10.5,
+            leading=15,
+            leftIndent=14,          # indentation like papers
+            firstLineIndent=-14,    # hanging indent 🔥
+            spaceAfter=6,
+            textColor=colors.HexColor("#1F2937"),
+        ),
     }
 
 
@@ -211,7 +222,18 @@ def generate_pdf(
             story.append(Paragraph(paragraph_html(tag), styles["blockquote"]))
 
     if sources:
-        story.extend([_divider(), Paragraph("References", styles["section"]), _table_flow(references_table_data(sources))])
+        # story.extend([_divider(), Paragraph("References", styles["section"]), _table_flow(references_table_data(sources))])
+        story.append(_divider())
+        story.append(Paragraph("References", styles["section"]))
+
+        for i, src in enumerate(sources, 1):
+            title = sanitize_text(src.get("title", ""))
+            domain = sanitize_text(src.get("domain", ""))
+            url = sanitize_text(src.get("url", ""))
+
+            ref_text = f"[{i}] {title}. {domain}. {url}"
+            story.append(Paragraph(ref_text, styles["reference"]))
+            story.append(Spacer(1, 6))
 
     def decorate(canvas, current_doc):
         _watermark(canvas, watermark_text)

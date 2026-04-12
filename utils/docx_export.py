@@ -107,7 +107,22 @@ def generate_docx(
 
     if sources:
         _add_paragraph(document, "References", "Heading 2")
-        _add_table(document, references_table_data(sources))
+        # _add_table(document, references_table_data(sources))
+
+        for i, src in enumerate(sources, 1):
+            title = sanitize_text(src.get("title", ""))
+            domain = sanitize_text(src.get("domain", ""))
+            url = sanitize_text(src.get("url", ""))
+
+            text = f"[{i}] {title}. {domain}. {url}"
+
+            p = document.add_paragraph()
+            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.first_line_indent = Inches(-0.25)
+
+            run = p.add_run(text)
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(11)
 
     output = io.BytesIO()
     document.save(output)
