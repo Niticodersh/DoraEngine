@@ -35,6 +35,15 @@ export async function signup(payload) {
   return readJson(response);
 }
 
+export async function verifySignupOtp(payload) {
+  const response = await fetch(buildUrl("/api/auth/signup/verify"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return readJson(response);
+}
+
 export async function login(payload) {
   const response = await fetch(buildUrl("/api/auth/login"), {
     method: "POST",

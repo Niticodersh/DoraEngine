@@ -27,6 +27,7 @@ import {
   updateProfile,
   createPaymentOrder,
   verifyPaymentSignature,
+  verifySignupOtp,
 } from "./api";
 
 
@@ -373,8 +374,8 @@ function LandingPage({ onLogin, onSignUp }) {
    ───────────────────────────────────────────────────────────────────────────── */
 
 function AuthPage({ defaultMode = "login", onBack, onSuccess, onForgotPassword, notice = "" }) {
-  const [mode, setMode] = useState(defaultMode);
-  const [form, setForm] = useState({ email: "", password: "", mobile: "" });
+  const [mode, setMode] = useState(defaultMode); // "login", "signup", "signup_verify"
+  const [form, setForm] = useState({ email: "", password: "", mobile: "", otp: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(notice || "");
 
@@ -388,13 +389,23 @@ function AuthPage({ defaultMode = "login", onBack, onSuccess, onForgotPassword, 
       if (mode === "login") {
         const payload = await login({ email: form.email, password: form.password });
         onSuccess(payload, "login");
-      } else {
+      } else if (mode === "signup") {
         if (form.password.length < 8) throw new Error("Password must be at least 8 characters.");
         const payload = await signup({
           email: form.email.trim().toLowerCase(),
           password: form.password,
           mobile: form.mobile.trim(),
-          email_verified: true,
+        });
+        if (payload.status === "needs_otp") {
+          setMode("signup_verify");
+        } else {
+          // Fallback if somehow it skipped OTP
+          onSuccess(payload, "signup");
+        }
+      } else if (mode === "signup_verify") {
+        const payload = await verifySignupOtp({
+          email: form.email.trim().toLowerCase(),
+          otp_code: form.otp.trim(),
         });
         onSuccess(payload, "signup");
       }
@@ -437,15 +448,19 @@ function AuthPage({ defaultMode = "login", onBack, onSuccess, onForgotPassword, 
           </button>
 
           <h1 className="auth-heading">
-            {mode === "login" ? "Welcome back" : "Create your account"}
+            {mode === "login" ? "Welcome back" 
+             : mode === "signup_verify" ? "Verify your email" 
+             : "Create your account"}
           </h1>
           <p className="auth-subheading">
-            {mode === "login"
-              ? "Sign in to your research workspace."
-              : "Get started — it's free to use with your own GROQ key."}
+            {mode === "login" ? "Sign in to your research workspace."
+             : mode === "signup_verify" ? "We sent a 6-digit code to your email."
+             : "Get started — it's free to use with your own GROQ key."}
           </p>
 
-          <div className="auth-mode-toggle">
+          {mode !== "signup_verify" && (
+            <>
+              <div className="auth-mode-toggle">
             <button className={`auth-mode-btn ${mode === "login" ? "active" : ""}`}
               onClick={() => { setMode("login"); setError(""); }} id="auth-tab-login">
               Sign In
@@ -510,6 +525,44 @@ function AuthPage({ defaultMode = "login", onBack, onSuccess, onForgotPassword, 
                 : mode === "login" ? "Sign In →" : "Sign Up →"}
             </button>
           </form>
+            </>
+          )}
+
+          {mode === "signup_verify" && (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>6-Digit Code</label>
+              <div className="input-with-icon">
+                <span className="input-icon"><Icons.Key /></span>
+                <input 
+                  type="text" 
+                  maxLength={6}
+                  placeholder="Enter code" 
+                  value={form.otp} 
+                  onChange={update("otp")} 
+                  required 
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="auth-error">
+                <Icons.Warning />
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary auth-submit" disabled={loading} id="auth-signup-verify-btn">
+              {loading ? "Verifying..." : "Complete Sign Up"}
+            </button>
+            <div className="auth-footer" style={{ marginTop: "1rem" }}>
+              <button type="button" className="text-secondary hover-white" onClick={() => setMode("signup")}>
+                Try a different email
+              </button>
+            </div>
+          </form>
+          )}
         </div>
       </div>
     </div>

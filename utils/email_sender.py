@@ -146,3 +146,47 @@ def send_password_reset_email(to_email: str, reset_url: str) -> bool:
         server.sendmail(gmail_user, to_email, msg.as_string())
 
     return True
+
+
+def send_signup_otp_email(to_email: str, otp: str) -> bool:
+    """
+    Sends a beautifully formatted OTP email via Gmail SMTP for new signups.
+    Returns True if sent, False if skipped (creds not configured).
+    """
+    creds = _get_smtp_creds()
+    if not creds:
+        return False  # Dev mode
+
+    gmail_user, gmail_app_password = creds
+    subject = f"{otp} is your DoraEngine verification code"
+
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:20px;font-family:sans-serif;background:#0f1117;color:#fff;">
+  <div style="max-width:500px;margin:0 auto;background:#1a1d27;padding:30px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:20px;font-weight:700;">Verify your email</h1>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.5;">Use the following 6-digit code to complete your DoraEngine sign up.</p>
+    <div style="background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.2);padding:15px;font-size:28px;letter-spacing:6px;font-weight:bold;color:#8b5cf6;border-radius:8px;margin:20px 0;">{otp}</div>
+    <p style="color:#64748b;font-size:13px;">This code will expire in 10 minutes.</p>
+  </div>
+</body>
+</html>
+"""
+
+    plain_body = f"Verify your DoraEngine email.\n\nYour code is: {otp}\n\nThis code expires in 10 minutes."
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"DoraEngine <{gmail_user}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(plain_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(gmail_user, gmail_app_password)
+        server.sendmail(gmail_user, to_email, msg.as_string())
+
+    return True

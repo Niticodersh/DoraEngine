@@ -26,7 +26,8 @@ from api.user_service import (
     generate_and_send_otp,
     generate_password_reset_token,
     verify_user_otp,
-    # get_chat_history,   # MVP: history disabled
+    initiate_signup_with_otp,
+    complete_signup_with_otp,
     get_plans,
     get_public_user,
     get_user_runtime_config,
@@ -56,6 +57,11 @@ class SignupRequest(BaseModel):
     # TODO (prod): require a Firebase ID token and verify with firebase-admin
     # instead of trusting this boolean from the client.
     email_verified: bool = False
+
+
+class SignupVerifyRequest(BaseModel):
+    email: str
+    otp_code: str
 
 
 class LoginRequest(BaseModel):
@@ -164,19 +170,23 @@ def plans() -> dict:
 @app.post("/api/auth/signup")
 def signup(request: SignupRequest):
     try:
-        user = create_user(
+        # Step 1: Just cache their details and send the OTP to their email
+        result = initiate_signup_with_otp(
             request.email,
             request.password,
             request.mobile,
-            is_verified=request.email_verified,
         )
-        auth = create_auth_response(user)
-        # Only generate backend OTP for legacy / unverified signups.
-        # Firebase-verified signups skip this path entirely.
-        if not request.email_verified:
-            otp_result = generate_and_send_otp(user["id"])
-            return {**auth, "otp_info": otp_result}
-        return auth
+        return {"status": "needs_otp", **result}
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/auth/signup/verify")
+def signup_verify(request: SignupVerifyRequest):
+    try:
+        # Step 2: Validate OTP. If valid, commit to DB and issue auth session.
+        user = complete_signup_with_otp(request.email, request.otp_code)
+        return create_auth_response(user)
     except Exception as exc:
         raise _http_error(exc) from exc
 

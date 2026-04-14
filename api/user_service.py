@@ -57,6 +57,10 @@ def _users():
     return get_db().users
 
 
+def _pending_signups():
+    return get_db().pending_signups
+
+
 # ── MVP: Chat history collection disabled ──────────────────────────────────────
 # def _history():
 #     return get_db().chat_history
@@ -120,6 +124,94 @@ def create_user(email: str, password: str, mobile: str, is_verified: bool = Fals
             raise ValueError("An account with this email already exists") from exc
         raise
 
+    doc["_id"] = result.inserted_id
+    return _serialize_user(doc)
+
+
+def initiate_signup_with_otp(email: str, password: str, mobile: str) -> dict:
+    email = email.strip().lower()
+    mobile = "".join(char for char in mobile if char.isdigit() or char == "+").strip()
+
+    if not email or not password or not mobile:
+        raise ValueError("Email, password, and mobile number are required")
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+
+    # Ensure user does not already exist
+    if _users().find_one({"email": email}):
+        raise ValueError("An account with this email already exists")
+    if _users().find_one({"mobile": mobile}):
+        raise ValueError("An account with this mobile number already exists")
+
+    otp = "".join(random.choices(string.digits, k=6))
+    expiry = _utcnow() + timedelta(minutes=10) # 10 minute expiry
+
+    from utils.email_sender import send_signup_otp_email
+    email_sent = send_signup_otp_email(email, otp)
+
+    payload = {
+        "email": email,
+        "mobile": mobile,
+        "password_hash": hash_password(password),
+        "otp_code": otp,
+        "otp_expiry": expiry,
+        "created_at": _utcnow()
+    }
+    
+    # Upsert the pending signup draft
+    _pending_signups().update_one({"email": email}, {"$set": payload}, upsert=True)
+
+    if email_sent:
+        return {"message": "OTP sent to email address successfully."}
+    else:
+        return {"message": "OTP recorded locally.", "dev_otp": otp}
+
+
+def complete_signup_with_otp(email: str, otp_code: str) -> dict:
+    email = email.strip().lower()
+    pending = _pending_signups().find_one({"email": email})
+    
+    if not pending:
+        raise ValueError("No pending sign up found. Please start over.")
+        
+    expiry = pending.get("otp_expiry")
+    if expiry and _utcnow() > (expiry.replace(tzinfo=timezone.utc) if expiry.tzinfo is None else expiry):
+        raise ValueError("OTP has expired. Please sign up again.")
+        
+    if pending.get("otp_code") != otp_code.strip():
+        raise ValueError("Invalid OTP. Please check your email and try again.")
+        
+    # Validation passed. Transfer them to the main `users` dataset securely.
+    try:
+        user = create_user(
+            email=pending["email"],
+            password="", # Irrelevant, we'll manually inject their preserved hash
+            mobile=pending["mobile"],
+            is_verified=True
+        )
+    except Exception as e:
+        # Overwrite the hash since create_user expects raw text but we only cached the hash
+        pass
+        
+    # The better way: just create it directly here to bypass double-hashing
+    doc = {
+        "email": pending["email"],
+        "mobile": pending["mobile"],
+        "password_hash": pending["password_hash"], # Use the original hash they created earlier
+        "plan_code": "free",
+        "is_verified": True, 
+        "groq_api_key": "",
+        "tavily_api_key": "",
+        "otp_code": "",
+        "otp_expiry": None,
+        "created_at": _utcnow(),
+    }
+    try:
+        result = _users().insert_one(doc)
+    except Exception as exc:
+        raise ValueError("Failed to finalize account. User may already exist.") from exc
+    
+    _pending_signups().delete_one({"email": email})
     doc["_id"] = result.inserted_id
     return _serialize_user(doc)
 
