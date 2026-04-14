@@ -143,6 +143,17 @@ def get_user_by_id(user_id: str) -> dict:
         raise ValueError("Invalid user id") from exc
     if not doc:
         raise ValueError("User not found")
+        
+    # Lazy Evaluation: Automatically downgrade expired subscription plans
+    expiry = doc.get("plan_expiry_date")
+    if expiry and _utcnow() > (expiry.replace(tzinfo=timezone.utc) if expiry.tzinfo is None else expiry):
+        _users().update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"plan_code": "free", "plan_expiry_date": None}}
+        )
+        doc["plan_code"] = "free"
+        doc["plan_expiry_date"] = None
+        
     return doc
 
 
@@ -162,7 +173,18 @@ def update_user_profile(user_id: str, groq_api_key: str | None = None) -> dict:
 
 def update_plan(user_id: str, plan_code: str) -> dict:
     get_plan(plan_code)
-    _users().update_one({"_id": ObjectId(user_id)}, {"$set": {"plan_code": plan_code}})
+    
+    # Calculate expiry based on plan
+    plan_expiry_date = None
+    if plan_code == "standard_daily":
+        plan_expiry_date = _utcnow() + timedelta(days=1)
+    elif plan_code == "standard_monthly":
+        plan_expiry_date = _utcnow() + timedelta(days=30)
+        
+    _users().update_one(
+        {"_id": ObjectId(user_id)}, 
+        {"$set": {"plan_code": plan_code, "plan_expiry_date": plan_expiry_date}}
+    )
     return get_public_user(user_id)
 
 
