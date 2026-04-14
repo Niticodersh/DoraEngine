@@ -947,9 +947,9 @@ function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChangin
           return (
             <div key={plan.code}
               className={`plan-onboarding-card ${isMonthly ? "featured" : ""}`}
-              onClick={() => !isCurrent && handleSelect(plan.code)}
+              onClick={() => !(isChanging && isCurrent) && handleSelect(plan.code)}
               role="button" tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && !isCurrent && handleSelect(plan.code)}>
+              onKeyDown={(e) => e.key === "Enter" && !(isChanging && isCurrent) && handleSelect(plan.code)}>
               {isMonthly && <div className="plan-badge-recommended">Best Value</div>}
               <div>
                 <div className="plan-name">{plan.name}</div>
@@ -977,12 +977,12 @@ function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChangin
               <div className="plan-cta">
                 <button
                   className={`btn btn-full ${isMonthly ? "btn-primary" : "btn-ghost"}`}
-                  disabled={selecting !== null || isCurrent}
+                  disabled={selecting !== null || (isChanging && isCurrent)}
                   id={`plan-select-${plan.code}`}
-                  onClick={(e) => { e.stopPropagation(); !isCurrent && handleSelect(plan.code); }}>
+                  onClick={(e) => { e.stopPropagation(); !(isChanging && isCurrent) && handleSelect(plan.code); }}>
                   {selecting === plan.code
                     ? <><div className="spinner" /> Processing…</>
-                    : isCurrent ? "Current plan"
+                    : (isChanging && isCurrent) ? "Current plan"
                       : plan.price_inr === 0 ? "Get started free" : `Choose ${plan.name}`}
                 </button>
               </div>
@@ -1770,6 +1770,7 @@ export default function RootApp() {
 
   // Prevents session-restore from overriding the reset_password screen.
   const resetPasswordRef = useRef(false);
+  const skipFetchMeRef = useRef(false);
 
   // Boot: detect password-reset link (?reset_email=...&reset_token=...)
   useEffect(() => {
@@ -1798,6 +1799,10 @@ export default function RootApp() {
       if (!resetPasswordRef.current) setScreen("landing");
       return;
     }
+    if (skipFetchMeRef.current) {
+      skipFetchMeRef.current = false;
+      return;
+    }
     fetchMe(token)
       .then((payload) => {
         const u = payload.user;
@@ -1817,6 +1822,7 @@ export default function RootApp() {
 
   // Auth flow — handles both login and direct signup
   function handleAuthSuccess(payload, mode) {
+    skipFetchMeRef.current = true;
     const u = payload.user;
     localStorage.setItem(STORAGE_KEY, payload.token);
     setToken(payload.token);
