@@ -97,6 +97,27 @@ export async function resetPassword(email, token, new_password) {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+// ── Payments Integration ──────────────────────────────────────────────────────
+
+export async function createPaymentOrder(token, payload) {
+  const response = await fetch(buildUrl("/api/payments/create-order"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(payload),
+  });
+  return readJson(response);
+}
+
+export async function verifyPaymentSignature(token, payload) {
+  const response = await fetch(buildUrl("/api/payments/verify"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(payload),
+  });
+  return readJson(response);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 export async function updateProfile(token, payload) {
   const response = await fetch(buildUrl("/api/profile"), {
     method: "PUT",

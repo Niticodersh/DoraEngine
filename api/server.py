@@ -10,6 +10,8 @@ import json
 import threading
 from queue import Queue
 
+import razorpay
+
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -32,7 +34,11 @@ from api.user_service import (
     # save_chat_history,  # MVP: history disabled
     update_plan,
     update_user_profile,
+    update_plan,
+    update_user_profile,
+    get_plan,
 )
+from utils.config import get_secret
 from utils.docx_export import generate_docx
 from utils.paper_pdf_export import generate_pdf
 from utils.security import decode_token
@@ -95,6 +101,17 @@ class PdfExportRequest(BaseModel):
 
 class DocxExportRequest(PdfExportRequest):
     pass
+
+
+class CreateOrderRequest(BaseModel):
+    plan_code: str
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    plan_code: str
 
 
 app = FastAPI(title="DoraEngine API", version="1.0.0")
@@ -266,6 +283,82 @@ def reset_password(request: ResetPasswordRequest):
 
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ── Payments Endpoints ────────────────────────────────────────────────────────
+
+def _get_razorpay_client():
+    key_id = get_secret("RAZORPAY_KEY_ID")
+    key_secret = get_secret("RAZORPAY_KEY_SECRET")
+    if not key_id or not key_secret:
+        raise ValueError("Razorpay credentials are not configured on the server.")
+    return razorpay.Client(auth=(key_id, key_secret))
+
+@app.post("/api/payments/create-order")
+def create_order(
+    request: CreateOrderRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    try:
+        user_id = _current_user_id(authorization)
+        plan = get_plan(request.plan_code)
+        
+        amount_inr = plan.get("price_inr", 0)
+        if amount_inr <= 0:
+            raise ValueError("Invalid plan for payment.")
+
+        # Calculate GST and total in paise (1 INR = 100 Paise)
+        gst = round(amount_inr * 0.18)
+        total_inr = amount_inr + gst
+        total_paise = int(total_inr * 100)
+
+        client = _get_razorpay_client()
+        order_data = {
+            "amount": total_paise,
+            "currency": "INR",
+            "receipt": f"rcpt_{str(user_id)[:12]}",   # Kept under 40 chars limit
+            "payment_capture": 1 # Automatic capture
+        }
+        order = client.order.create(data=order_data)
+
+        return {
+            "order_id": order["id"],
+            "amount": total_paise,
+            "currency": order["currency"],
+            "key_id": get_secret("RAZORPAY_KEY_ID")
+        }
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+@app.post("/api/payments/verify")
+def verify_payment(
+    request: VerifyPaymentRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    try:
+        user_id = _current_user_id(authorization)
+        client = _get_razorpay_client()
+
+        # Verify signature
+        params_dict = {
+            'razorpay_order_id': request.razorpay_order_id,
+            'razorpay_payment_id': request.razorpay_payment_id,
+            'razorpay_signature': request.razorpay_signature
+        }
+        
+        # This resolves to True or raises a SignatureVerificationError
+        client.utility.verify_payment_signature(params_dict)
+
+        # Update the user plan securely
+        user = update_plan(user_id, request.plan_code)
+        
+        return {"status": "success", "user": user}
+    except razorpay.errors.SignatureVerificationError as exc:
+        raise HTTPException(status_code=400, detail="Payment signature verification failed.") from exc
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+
 
 @app.put("/api/profile")
 def profile_update(
@@ -291,6 +384,12 @@ def profile_plan(
 ):
     try:
         user_id = _current_user_id(authorization)
+        
+        # Security: Do not allow direct API plan upgrades to paid plans.
+        # Paid plans MUST be processed through the Razorpay /verify endpoint.
+        if request.plan_code != "free":
+            raise ValueError("Directly upgrading to a paid plan is not allowed. Please complete payment.")
+            
         user = update_plan(user_id, request.plan_code)
         return {"user": user}
     except Exception as exc:

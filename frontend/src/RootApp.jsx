@@ -25,7 +25,8 @@ import {
   streamResearch,
   updatePlan,
   updateProfile,
-  verifyOtp,
+  createPaymentOrder,
+  verifyPaymentSignature,
 } from "./api";
 
 
@@ -999,35 +1000,89 @@ function GroqKeyPage({ onSave, onSkip, loading, error }) {
    RAZORPAY PAYMENT PAGE (Frontend UI — wire to backend when ready)
    ───────────────────────────────────────────────────────────────────────────── */
 
-function PaymentPage({ plan, user, onPaymentDone, onBack }) {
-  const [method, setMethod] = useState("upi");
-  const [upiId, setUpiId] = useState("");
-  const [card, setCard] = useState({ number: "", expiry: "", cvv: "", name: "" });
+function PaymentPage({ plan, user, onPaymentDone, onBack, token }) {
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
 
   const amount = plan?.price_inr || 0;
   const gst = Math.round(amount * 0.18);
   const total = amount + gst;
 
+  useEffect(() => {
+    // Dynamically load Razorpay SDK
+    if (!document.getElementById("razorpay-sdk")) {
+      const script = document.createElement("script");
+      script.id = "razorpay-sdk";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   async function handlePay() {
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1800)); // TODO: Replace with real Razorpay SDK
-    await onPaymentDone();
-    setProcessing(false);
-  }
+    setError("");
+    try {
+      if (!window.Razorpay) {
+        throw new Error("Razorpay SDK failed to load. Please check your connection.");
+      }
 
-  function formatCard(val) {
-    return val.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-  }
-  function formatExpiry(val) {
-    const d = val.replace(/\D/g, "").slice(0, 4);
-    return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+      // 1. Create order on backend
+      const orderRes = await createPaymentOrder(token, { plan_code: plan.code });
+
+      // 2. Setup Razorpay widget options
+      const options = {
+        key: orderRes.key_id, 
+        amount: orderRes.amount, 
+        currency: orderRes.currency,
+        name: "DoraEngine",
+        description: `Upgrade to ${plan.name}`,
+        order_id: orderRes.order_id,
+        handler: async function (response) {
+          try {
+            // 3. Verify signature on backend
+            setProcessing(true);
+            const verifyRes = await verifyPaymentSignature(token, {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan_code: plan.code
+            });
+            if (verifyRes.status === "success") {
+              onPaymentDone(verifyRes.user); // update the logged-in user state
+            }
+          } catch (err) {
+            setError(err.message || "Payment verification failed.");
+            setProcessing(false);
+          }
+        },
+        prefill: {
+          name: user.email.split("@")[0],
+          email: user.email,
+          contact: user.mobile || "",
+        },
+        theme: {
+          color: "#8b5cf6", // match DoraEngine primary accent
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", function (response) {
+        setError(response.error.description || "Payment failed.");
+        setProcessing(false);
+      });
+      
+      rzp.open();
+    } catch (err) {
+      setError(err.message || "Unable to initiate payment.");
+      setProcessing(false);
+    }
   }
 
   return (
     <div className="payment-page-wrapper">
       <div className="payment-header">
-        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ margin: "0 auto 1.5rem" }}>
+        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ margin: "0 auto 1.5rem", pointerEvents: processing ? "none" : "auto", opacity: processing ? 0.5 : 1 }}>
           <Icons.ArrowLeft /> Change plan
         </button>
         <h1 className="onboarding-title" style={{ marginBottom: "0.4rem" }}>Complete payment</h1>
@@ -1061,77 +1116,28 @@ function PaymentPage({ plan, user, onPaymentDone, onBack }) {
           </div>
         </div>
 
-        <div className="payment-form-card">
-          <div style={{ marginBottom: "1.25rem" }}>
-            <div className="field-label" style={{ marginBottom: "0.4rem" }}>Contact</div>
-            <input className="field-input" type="email" value={user?.email || ""} readOnly style={{ opacity: 0.7 }} />
-          </div>
-          <div className="payment-method-tabs">
-            {[{ id: "upi", label: "UPI" }, { id: "card", label: "Card" }, { id: "netbanking", label: "Net Banking" }].map((m) => (
-              <button key={m.id} className={`payment-method-tab ${method === m.id ? "active" : ""}`}
-                onClick={() => setMethod(m.id)} id={`payment-tab-${m.id}`}>
-                {m.label}
-              </button>
-            ))}
+        <div className="payment-form-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <h3 style={{ fontSize: "1.1rem", marginBottom: "0.5rem", color: "var(--text-primary)" }}>Ready to checkout?</h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+              Click below to securely complete your payment using UPI, QR code, credit/debit cards, or netbanking.
+            </p>
           </div>
 
-          {method === "upi" && (
-            <div className="form-group">
-              <div className="field">
-                <label className="field-label" htmlFor="upi-input">UPI ID</label>
-                <input id="upi-input" className="field-input" value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)} placeholder="yourname@upi" />
-              </div>
-            </div>
-          )}
-          {method === "card" && (
-            <div className="form-group">
-              <div className="field">
-                <label className="field-label" htmlFor="card-number">Card number</label>
-                <input id="card-number" className="field-input" value={card.number}
-                  onChange={(e) => setCard((c) => ({ ...c, number: formatCard(e.target.value) }))}
-                  placeholder="1234 5678 9012 3456" maxLength={19} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
-                <div className="field">
-                  <label className="field-label" htmlFor="card-expiry">Expiry</label>
-                  <input id="card-expiry" className="field-input" value={card.expiry}
-                    onChange={(e) => setCard((c) => ({ ...c, expiry: formatExpiry(e.target.value) }))}
-                    placeholder="MM/YY" maxLength={5} />
-                </div>
-                <div className="field">
-                  <label className="field-label" htmlFor="card-cvv">CVV</label>
-                  <input id="card-cvv" className="field-input" type="password" value={card.cvv}
-                    onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, "").slice(0, 3) }))}
-                    placeholder="•••" maxLength={3} />
-                </div>
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="card-name">Name on card</label>
-                <input id="card-name" className="field-input" value={card.name}
-                  onChange={(e) => setCard((c) => ({ ...c, name: e.target.value }))} placeholder="Full name" />
-              </div>
-            </div>
-          )}
-          {method === "netbanking" && (
-            <div className="form-group">
-              <div className="field">
-                <label className="field-label" htmlFor="bank-select">Select bank</label>
-                <select id="bank-select" className="field-input" style={{ cursor: "pointer" }}>
-                  <option value="">Choose your bank</option>
-                  {["HDFC Bank", "ICICI Bank", "SBI", "Axis Bank", "Kotak Bank", "Yes Bank"].map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </div>
+          {error && (
+            <div className="auth-error" style={{ marginBottom: "1.5rem" }} role="alert">
+              <Icons.Warning /> {error}
             </div>
           )}
 
           <button className="btn btn-primary btn-full" disabled={processing}
-            onClick={handlePay} id="pay-now-btn" style={{ marginTop: "0.5rem" }}>
-            {processing ? <><div className="spinner" /> Processing payment…</> : <><Icons.Lock /> Pay ₹{total}</>}
+            onClick={handlePay} id="pay-now-btn" style={{ padding: "1rem" }}>
+            {processing ? <><div className="spinner" /> Processing…</> : <><Icons.Lock /> Proceed to pay ₹{total}</>}
           </button>
-          <div className="payment-powered">Secured by <span>Razorpay</span> · PCI DSS compliant</div>
+          
+          <div className="payment-powered" style={{ marginTop: "1.5rem" }}>
+            Secured by <span>Razorpay</span> · PCI DSS compliant
+          </div>
         </div>
       </div>
     </div>
@@ -1804,14 +1810,11 @@ export default function RootApp() {
     }
   }
 
-  async function handlePaymentDone() {
-    try {
-      const response = await updatePlan(token, { plan_code: pendingPlanCode });
-      setUser(response.user);
+  async function handlePaymentDone(updatedUser) {
+    if (updatedUser) {
+      setUser(updatedUser);
       setScreen("app");
       setPendingPlanCode(null);
-    } catch (err) {
-      console.error("Plan update failed:", err);
     }
   }
 
@@ -1929,6 +1932,7 @@ export default function RootApp() {
       <PaymentPage
         plan={pendingPlan}
         user={user}
+        token={token}
         onPaymentDone={handlePaymentDone}
         onBack={() => setScreen("plan_select")}
       />
