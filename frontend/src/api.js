@@ -30,7 +30,7 @@ export async function signup(payload) {
   const response = await fetch(buildUrl("/api/auth/signup"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ email_verified: false, ...payload }),
   });
   return readJson(response);
 }
@@ -50,6 +50,52 @@ export async function fetchMe(token) {
   });
   return readJson(response);
 }
+
+// ── OTP Verification ───────────────────────────────────────────────────────────
+
+export async function sendOtp(token) {
+  const response = await fetch(buildUrl("/api/auth/send-otp"), {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  return readJson(response);
+}
+
+export async function verifyOtp(token, otp_code) {
+  const response = await fetch(buildUrl("/api/auth/verify-otp"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ otp_code }),
+  });
+  return readJson(response);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
+// ── Password Reset ─────────────────────────────────────────────────────────────
+
+export async function forgotPassword(email) {
+  const response = await fetch(buildUrl("/api/auth/forgot-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return readJson(response);
+}
+
+export async function resetPassword(email, token, new_password) {
+  const response = await fetch(buildUrl("/api/auth/reset-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, token, new_password }),
+  });
+  return readJson(response);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 export async function updateProfile(token, payload) {
   const response = await fetch(buildUrl("/api/profile"), {
@@ -75,12 +121,13 @@ export async function updatePlan(token, payload) {
   return readJson(response);
 }
 
-export async function fetchHistory(token) {
-  const response = await fetch(buildUrl("/api/history"), {
-    headers: authHeaders(token),
-  });
-  return readJson(response);
-}
+// MVP: History fetch disabled — endpoint is commented out on backend
+// export async function fetchHistory(token) {
+//   const response = await fetch(buildUrl("/api/history"), {
+//     headers: authHeaders(token),
+//   });
+//   return readJson(response);
+// }
 
 export async function exportDocument(token, type, payload) {
   const response = await fetch(buildUrl(`/api/export/${type}`), {
@@ -94,7 +141,7 @@ export async function exportDocument(token, type, payload) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "Failed to export PDF");
+    throw new Error(text || "Failed to export");
   }
 
   return response.blob();

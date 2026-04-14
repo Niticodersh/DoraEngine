@@ -1,6 +1,8 @@
 """MongoDB access helpers."""
 from __future__ import annotations
 
+import ssl
+
 from pymongo import ASCENDING, MongoClient
 from pymongo.database import Database
 
@@ -17,7 +19,12 @@ def get_db() -> Database:
         raise RuntimeError("MONGODB_URI not set")
 
     if _client is None:
-        _client = MongoClient(uri)
+        _client = MongoClient(
+            uri,
+            tls=True,
+            tlsAllowInvalidCertificates=True,   # Dev-only: bypasses cert validation
+            serverSelectionTimeoutMS=15000,
+        )
         database = _client[db_name]
         database.users.create_index([("mobile", ASCENDING)], unique=True)
         database.users.create_index([("email", ASCENDING)], unique=True)

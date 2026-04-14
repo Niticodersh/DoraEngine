@@ -1,4 +1,8 @@
-"""FastAPI server exposing the decoupled DoraEngine backend."""
+"""FastAPI server exposing the decoupled DoraEngine backend.
+
+MVP NOTE: Chat history endpoints are commented out.
+         OTP verification endpoints added for mobile/email verification.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -17,11 +21,15 @@ from api.user_service import (
     create_auth_response,
     create_user,
     authenticate_user,
-    get_chat_history,
+    generate_and_send_otp,
+    generate_password_reset_token,
+    verify_user_otp,
+    # get_chat_history,   # MVP: history disabled
     get_plans,
     get_public_user,
     get_user_runtime_config,
-    save_chat_history,
+    reset_password_with_token,
+    # save_chat_history,  # MVP: history disabled
     update_plan,
     update_user_profile,
 )
@@ -38,6 +46,10 @@ class SignupRequest(BaseModel):
     email: str
     password: str
     mobile: str
+    # Set by the frontend after Firebase email-link verification completes.
+    # TODO (prod): require a Firebase ID token and verify with firebase-admin
+    # instead of trusting this boolean from the client.
+    email_verified: bool = False
 
 
 class LoginRequest(BaseModel):
@@ -47,12 +59,25 @@ class LoginRequest(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     groq_api_key: str | None = None
-    tavily_api_key: str | None = None
+    # tavily_api_key: str | None = None  # MVP: not exposed to users
 
 
 class PlanUpdateRequest(BaseModel):
     plan_code: str
 
+
+class OtpVerifyRequest(BaseModel):
+    otp_code: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    token: str
+    new_password: str
 
 class FollowupRequest(BaseModel):
     query: str = Field(..., min_length=1)
@@ -122,8 +147,19 @@ def plans() -> dict:
 @app.post("/api/auth/signup")
 def signup(request: SignupRequest):
     try:
-        user = create_user(request.email, request.password, request.mobile)
-        return create_auth_response(user)
+        user = create_user(
+            request.email,
+            request.password,
+            request.mobile,
+            is_verified=request.email_verified,
+        )
+        auth = create_auth_response(user)
+        # Only generate backend OTP for legacy / unverified signups.
+        # Firebase-verified signups skip this path entirely.
+        if not request.email_verified:
+            otp_result = generate_and_send_otp(user["id"])
+            return {**auth, "otp_info": otp_result}
+        return auth
     except Exception as exc:
         raise _http_error(exc) from exc
 
@@ -146,6 +182,91 @@ def me(authorization: str | None = Header(default=None, alias="Authorization")):
         raise _http_error(exc) from exc
 
 
+# ── OTP Endpoints ──────────────────────────────────────────────────────────────
+
+@app.post("/api/auth/send-otp")
+def send_otp(authorization: str | None = Header(default=None, alias="Authorization")):
+    """
+    (Re)generates and sends OTP to user's registered mobile and email.
+    Call this on signup (auto-triggered) and when user clicks 'Resend OTP'.
+
+    TODO (Production): Remove 'dev_otp' from the response. Wire actual
+    SMS (Twilio/MSG91) and email (SendGrid/SES) delivery inside
+    generate_and_send_otp() in user_service.py.
+    """
+    try:
+        user_id = _current_user_id(authorization)
+        result = generate_and_send_otp(user_id)
+        return result
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/auth/verify-otp")
+def verify_otp(
+    request: OtpVerifyRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    """
+    Validates the submitted OTP. Marks user as verified on success.
+    Returns updated user object.
+    """
+    try:
+        user_id = _current_user_id(authorization)
+        user = verify_user_otp(user_id, request.otp_code)
+        return {"user": user}
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+
+# ── Password Reset Endpoints ───────────────────────────────────────────────────
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(
+    request: ForgotPasswordRequest,
+    origin: str | None = Header(default=None, alias="Origin"),
+    referer: str | None = Header(default=None, alias="Referer"),
+):
+    """
+    Generates a password-reset token for the given email (if it exists).
+    Always returns 200 to prevent email enumeration.
+
+    If GMAIL_USER + GMAIL_APP_PASSWORD are set in .env, sends a real email.
+    Otherwise returns dev_reset_url for local click-through testing.
+    """
+    try:
+        # Determine the app's base URL from the request so the reset link
+        # in the email goes to the correct frontend (works for any domain).
+        base_url = origin or ""
+        if not base_url and referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+        if not base_url:
+            base_url = "http://localhost:5173"  # local dev fallback
+
+        result = generate_password_reset_token(request.email, app_base_url=base_url)
+        return result
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(request: ResetPasswordRequest):
+    """
+    Validates the reset token and updates the user password.
+    """
+    try:
+        result = reset_password_with_token(request.email, request.token, request.new_password)
+        return result
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+
+
 @app.put("/api/profile")
 def profile_update(
     request: ProfileUpdateRequest,
@@ -156,7 +277,7 @@ def profile_update(
         user = update_user_profile(
             user_id,
             groq_api_key=request.groq_api_key,
-            tavily_api_key=request.tavily_api_key,
+            # tavily_api_key not accepted from frontend in MVP
         )
         return {"user": user}
     except Exception as exc:
@@ -176,13 +297,18 @@ def profile_plan(
         raise _http_error(exc) from exc
 
 
-@app.get("/api/history")
-def history(authorization: str | None = Header(default=None, alias="Authorization")):
-    try:
-        user_id = _current_user_id(authorization)
-        return {"items": get_chat_history(user_id)}
-    except Exception as exc:
-        raise _http_error(exc) from exc
+# ── MVP: History endpoint DISABLED ─────────────────────────────────────────────
+# Re-enable when history feature is included in a release.
+
+# @app.get("/api/history")
+# def history(authorization: str | None = Header(default=None, alias="Authorization")):
+#     try:
+#         user_id = _current_user_id(authorization)
+#         return {"items": get_chat_history(user_id)}
+#     except Exception as exc:
+#         raise _http_error(exc) from exc
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 @app.post("/api/research")
@@ -196,8 +322,9 @@ def research(request: ResearchRequest, authorization: str | None = Header(defaul
             tavily_api_key=runtime["tavily_api_key"],
             requires_user_key=runtime["requires_user_api_key"],
         )
-        if result.get("success"):
-            save_chat_history(user_id, request.query, result)
+        # MVP: History saving disabled
+        # if result.get("success"):
+        #     save_chat_history(user_id, request.query, result)
         return result
     except Exception as exc:
         raise _http_error(exc) from exc
@@ -286,8 +413,9 @@ async def research_stream(
                 tavily_api_key=runtime["tavily_api_key"],
                 requires_user_key=runtime["requires_user_api_key"],
             )
-            if result.get("success"):
-                save_chat_history(user_id, request.query, result)
+            # MVP: History saving disabled
+            # if result.get("success"):
+            #     save_chat_history(user_id, request.query, result)
             queue.put({"type": "complete", "result": result})
         except Exception as exc:
             queue.put({"type": "error", "error": str(exc)})
