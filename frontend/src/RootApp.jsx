@@ -1435,17 +1435,79 @@ function ReasoningTab({ result }) {
 
 function GraphTab({ result }) {
   const graph = result?.graph;
+  const [helpOpen, setHelpOpen] = useState(false);
   if (!graph?.stats?.nodes) return <div className="content-card"><div className="empty-state"><div className="empty-state-icon">⬡</div>Knowledge graph is empty or unavailable.</div></div>;
+
+  const domainCount = graph.stats.top_domains?.length ?? 0;
 
   return (
     <div className="tab-content-area">
       <div className="content-card">
-        <h3 className="card-title">Knowledge Graph — {graph.stats.nodes} nodes · {graph.stats.edges} edges</h3>
-        <iframe className="graph-frame" srcDoc={graph.html} title="Knowledge Graph" sandbox="allow-scripts" />
+
+        {/* Stat pill strip */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "20px", padding: "4px 12px", fontSize: "0.8rem", color: "#a78bfa" }}>
+              <span>⬡</span> <strong>{graph.stats.nodes}</strong> <span style={{ color: "var(--text-muted)" }}>nodes</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "20px", padding: "4px 12px", fontSize: "0.8rem", color: "#60a5fa" }}>
+              <span>↔</span> <strong>{graph.stats.edges}</strong> <span style={{ color: "var(--text-muted)" }}>connections</span>
+            </div>
+            {domainCount > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.18)", borderRadius: "20px", padding: "4px 12px", fontSize: "0.8rem", color: "#34d399" }}>
+                <span>🌐</span> <strong>{domainCount}</strong> <span style={{ color: "var(--text-muted)" }}>websites</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Collapsible plain-English explainer */}
+        <div style={{ marginBottom: "0.75rem", background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: "10px", overflow: "hidden" }}>
+          <button
+            onClick={() => setHelpOpen(o => !o)}
+            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)" }}>
+            <span style={{ fontSize: "0.84rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "7px" }}>
+              <span>💡</span> What am I looking at?
+            </span>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", transition: "transform 0.2s", display: "inline-block", transform: helpOpen ? "rotate(180deg)" : "none" }}>▾</span>
+          </button>
+          {helpOpen && (
+            <div style={{ padding: "0 14px 14px", borderTop: "1px solid rgba(99,102,241,0.15)" }}>
+              <p style={{ fontSize: "0.83rem", color: "var(--text-secondary)", marginTop: "10px", marginBottom: "12px", lineHeight: "1.6" }}>
+                This is a visual map of all the information DoraEngine gathered from the web to answer your question.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
+                {[
+                  ["🫧", "Each bubble", "is a snippet of content from a real webpage — like a note DoraEngine jotted down during research."],
+                  ["↔", "A line between bubbles", "means those two snippets are about a similar topic. More lines = more important idea."],
+                  ["🎨", "Colours", "represent different websites. Same colour = same source. Check the legend inside the graph (top-right) to see which colour is which site."],
+                  ["👆", "Hover over any bubble", "to read a preview of that content. Drag to explore, scroll to zoom, or click \"Fit view\" to reset."],
+                ].map(([icon, bold, rest]) => (
+                  <div key={bold} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                    <span style={{ fontSize: "1rem", flexShrink: 0, marginTop: "1px" }}>{icon}</span>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: "1.55" }}>
+                      <strong style={{ color: "var(--text-primary)" }}>{bold}</strong> {rest}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Graph iframe */}
+        <iframe className="graph-frame" srcDoc={graph.html} title="Knowledge Graph" sandbox="allow-scripts allow-same-origin" />
+
+        <div style={{ marginTop: "0.6rem", fontSize: "0.74rem", color: "var(--text-muted)", display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+          <span><span style={{ color: "#7c3aed" }}>—</span> Same topic</span>
+          <span><span style={{ color: "#3b82f6" }}>—</span> Same article</span>
+          <span style={{ marginLeft: "auto" }}>A guide is available inside the map ↗</span>
+        </div>
       </div>
+
       {!!graph.stats.top_domains?.length && (
         <div className="content-card">
-          <h3 className="card-title">Top Domains in Graph</h3>
+          <h3 className="card-title">Top Websites in Graph</h3>
           <div className="domains-chart">
             {graph.stats.top_domains.map((entry) => (
               <div key={entry.domain} className="domain-row">
