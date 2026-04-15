@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import smtplib
 import ssl
+import certifi
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -140,8 +141,11 @@ def send_password_reset_email(to_email: str, reset_url: str) -> bool:
     msg.attach(MIMEText(plain_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls(context=context)
         server.login(gmail_user, gmail_app_password)
         server.sendmail(gmail_user, to_email, msg.as_string())
 
@@ -184,8 +188,11 @@ def send_signup_otp_email(to_email: str, otp: str) -> bool:
     msg.attach(MIMEText(plain_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls(context=context)
         server.login(gmail_user, gmail_app_password)
         server.sendmail(gmail_user, to_email, msg.as_string())
 

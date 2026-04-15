@@ -68,13 +68,18 @@ def _pending_signups():
 
 
 def _serialize_user(doc: dict) -> dict:
+    def _iso_utc(dt):
+        if not dt: return None
+        return (dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt).isoformat()
+
     return {
         "id": str(doc["_id"]),
         "email": doc["email"],
         "mobile": doc["mobile"],
         "plan_code": doc.get("plan_code", "free"),
         "is_verified": bool(doc.get("is_verified", False)),
-        "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+        "created_at": _iso_utc(doc.get("created_at")),
+        "plan_expiry_date": _iso_utc(doc.get("plan_expiry_date")),
         "has_groq_api_key": bool(doc.get("groq_api_key")),
         # MVP: Tavily key hidden from serialized user — backend still reads it internally
         # "has_tavily_api_key": bool(doc.get("tavily_api_key")),

@@ -877,8 +877,13 @@ function ResetPasswordPage({ email, token, onSuccess }) {
    PLAN SELECTION PAGE
    ───────────────────────────────────────────────────────────────────────────── */
 
-function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChanging = false }) {
+function PlanSelectionPage({ plans, user, currentPlanCode, onSelect, onSkip, isChanging = false }) {
   const [selecting, setSelecting] = useState(null);
+
+  const hasActivePaidPlan = user && user.plan_code && user.plan_code !== "free";
+  const formattedExpiry = user?.plan_expiry_date ? new Date(user.plan_expiry_date).toLocaleString(undefined, {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  }) : "it expires";
 
   async function handleSelect(planCode) {
     setSelecting(planCode);
@@ -938,6 +943,15 @@ function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChangin
         </p>
       </div>
 
+      {hasActivePaidPlan && (
+        <div className="auth-error" style={{ marginBottom: "1.5rem", maxWidth: "800px", margin: "0 auto 1.5rem auto", backgroundColor: "rgba(99, 102, 241, 0.1)", border: "1px solid rgba(99, 102, 241, 0.2)", color: "var(--indigo-300)" }}>
+          <div style={{ marginLeft: "0.5rem" }}>
+            <span style={{ fontWeight: "600" }}>You currently have an active paid plan ({user?.plan_code === "standard_daily" ? "Daily" : "Monthly"}).</span><br/>
+            You can select another plan after {formattedExpiry}.
+          </div>
+        </div>
+      )}
+
       <div className="plans-onboarding-grid">
         {plans.map((plan) => {
           const { included, excluded } = getPlanFeatures(plan);
@@ -947,9 +961,10 @@ function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChangin
           return (
             <div key={plan.code}
               className={`plan-onboarding-card ${isMonthly ? "featured" : ""}`}
-              onClick={() => !(isChanging && isCurrent) && handleSelect(plan.code)}
+              style={{ opacity: hasActivePaidPlan && !isCurrent ? 0.6 : 1 }}
+              onClick={() => !(isChanging && isCurrent) && !hasActivePaidPlan && handleSelect(plan.code)}
               role="button" tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && !(isChanging && isCurrent) && handleSelect(plan.code)}>
+              onKeyDown={(e) => e.key === "Enter" && !(isChanging && isCurrent) && !hasActivePaidPlan && handleSelect(plan.code)}>
               {isMonthly && <div className="plan-badge-recommended">Best Value</div>}
               <div>
                 <div className="plan-name">{plan.name}</div>
@@ -977,12 +992,13 @@ function PlanSelectionPage({ plans, currentPlanCode, onSelect, onSkip, isChangin
               <div className="plan-cta">
                 <button
                   className={`btn btn-full ${isMonthly ? "btn-primary" : "btn-ghost"}`}
-                  disabled={selecting !== null || (isChanging && isCurrent)}
+                  disabled={selecting !== null || (isChanging && isCurrent) || hasActivePaidPlan}
                   id={`plan-select-${plan.code}`}
-                  onClick={(e) => { e.stopPropagation(); !(isChanging && isCurrent) && handleSelect(plan.code); }}>
+                  onClick={(e) => { e.stopPropagation(); !(isChanging && isCurrent) && !hasActivePaidPlan && handleSelect(plan.code); }}>
                   {selecting === plan.code
                     ? <><div className="spinner" /> Processing…</>
                     : (isChanging && isCurrent) ? "Current plan"
+                      : hasActivePaidPlan ? "Locked"
                       : plan.price_inr === 0 ? "Get started free" : `Choose ${plan.name}`}
                 </button>
               </div>
@@ -1452,13 +1468,29 @@ function GraphTab({ result }) {
    ───────────────────────────────────────────────────────────────────────────── */
 
 function ResearchPage({ user, config, token }) {
-  const [query, setQuery] = useState("");
-  const [result, setResult] = useState(null);
+  const [query, setQuery] = useState(() => sessionStorage.getItem("dora_query") || "");
+  const [result, setResult] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("dora_result")) || null; }
+    catch { return null; }
+  });
   const [researching, setResearching] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState(RESEARCH_TABS[0].id);
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem("dora_tab") || RESEARCH_TABS[0].id);
   const [activeStage, setActiveStage] = useState(null);
   const [stageHistory, setStageHistory] = useState([]);
+
+  useEffect(() => {
+    sessionStorage.setItem("dora_query", query);
+  }, [query]);
+
+  useEffect(() => {
+    sessionStorage.setItem("dora_tab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (result) sessionStorage.setItem("dora_result", JSON.stringify(result));
+    else sessionStorage.removeItem("dora_result");
+  }, [result]);
 
   const requiresApiKey = user?.plan_code === "free" && !user?.has_groq_api_key;
   const stats = result?.stats || null;
@@ -1717,7 +1749,11 @@ function ProfilePage({ user, token, onUserUpdate }) {
    ───────────────────────────────────────────────────────────────────────────── */
 
 function AppShell({ user, token, config, plans, onLogout, onUserUpdate, onPlanChange }) {
-  const [page, setPage] = useState("research");
+  const [page, setPage] = useState(() => sessionStorage.getItem("dora_page") || "research");
+
+  useEffect(() => {
+    sessionStorage.setItem("dora_page", page);
+  }, [page]);
 
   return (
     <div className="app-root">
@@ -1731,6 +1767,7 @@ function AppShell({ user, token, config, plans, onLogout, onUserUpdate, onPlanCh
           {page === "plans" && (
             <PlanSelectionPage
               plans={plans}
+              user={user}
               currentPlanCode={user?.plan_code}
               onSelect={(planCode) => onPlanChange(planCode, setPage)}
               onSkip={() => setPage("research")}
@@ -1921,6 +1958,7 @@ export default function RootApp() {
 
   function handleLogout() {
     localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.clear();
     setToken("");
     setUser(null);
     setPendingPlanCode(null);
@@ -1967,6 +2005,7 @@ export default function RootApp() {
     return (
       <PlanSelectionPage
         plans={plans}
+        user={user}
         currentPlanCode={user?.plan_code}
         onSelect={handlePlanSelect}
         onSkip={() => setScreen("app")}

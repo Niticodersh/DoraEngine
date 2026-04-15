@@ -1,6 +1,7 @@
 """Publication-style PDF export for DoraEngine research papers."""
 from __future__ import annotations
 
+import html
 import io
 import os
 from datetime import datetime
@@ -131,17 +132,41 @@ def _divider() -> HRFlowable:
     return HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#D1D5DB"), spaceBefore=6, spaceAfter=10)
 
 
-def _table_flow(data: list[list[str]]) -> Table:
-    table = Table(data, repeatRows=1)
+def _table_flow(data: list[list[str]], styles: dict) -> Table:
+    if not data or not data[0]:
+        return Table(data)
+
+    # Convert texts to Paragraphs for text wrapping
+    wrapped_data = []
+    
+    cell_style = styles["body"].clone("TableCell")
+    cell_style.fontSize = 9
+    cell_style.leading = 12
+    cell_style.alignment = 0 # TA_LEFT
+    cell_style.spaceAfter = 0
+    cell_style.spaceBefore = 0
+    
+    header_style = cell_style.clone("TableHeader")
+    header_style.fontName = _FONT_BOLD
+    header_style.textColor = colors.HexColor("#111827")
+    
+    for row_idx, row in enumerate(data):
+        wrapped_row = []
+        for cell_text in row:
+            style = header_style if row_idx == 0 else cell_style
+            text = html.escape(str(cell_text))
+            wrapped_row.append(Paragraph(text, style))
+        wrapped_data.append(wrapped_row)
+
+    # A4 width = 595.27. Margins = 2.1cm (59.5) * 2 = 119. Usable = 476.27
+    usable_width = 476.27
+    col_width = usable_width / len(data[0])
+
+    table = Table(wrapped_data, colWidths=[col_width] * len(data[0]), repeatRows=1)
     table.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5E7EB")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
-                ("FONTNAME", (0, 0), (-1, 0), _FONT_BOLD),
-                ("FONTNAME", (0, 1), (-1, -1), _FONT_REGULAR),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("LEADING", (0, 0), (-1, -1), 12),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9CA3AF")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9FAFB")]),
@@ -216,7 +241,7 @@ def generate_pdf(
             data = table_matrix(tag)
             if data:
                 story.append(Spacer(1, 4))
-                story.append(_table_flow(data))
+                story.append(_table_flow(data, styles))
                 story.append(Spacer(1, 8))
         elif name == "blockquote":
             story.append(Paragraph(paragraph_html(tag), styles["blockquote"]))
