@@ -7,14 +7,15 @@ import warnings
 warnings.filterwarnings("ignore", category=ImportWarning, module="transformers.*")
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity as _cosine_sim
 
 _MODEL_NAME = "all-MiniLM-L6-v2"
 _embedder_instance: SentenceTransformer | None = None
 
 
-def _get_model() -> SentenceTransformer:
+def _get_model():
+    from sentence_transformers import SentenceTransformer
     global _embedder_instance
     if _embedder_instance is None:
         _embedder_instance = SentenceTransformer(_MODEL_NAME)
