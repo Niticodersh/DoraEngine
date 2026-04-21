@@ -55,7 +55,7 @@ sentence_transformers/
 *.bin
 
 # ─── LangGraph / pipeline artifacts ───────────────────
-*.json
+# *.json (Commented out because it ignores package.json in the frontend!)
 
 # (optional: comment this if you WANT to track outputs)
 # outputs/
