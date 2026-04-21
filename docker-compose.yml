@@ -1,7 +1,34 @@
 services:
-  doraengine:
+  backend:
     build: .
-    container_name: doraengine
+    container_name: doraengine-backend
+    command: uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: doraengine-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  streamlit:
+    build: .
+    container_name: doraengine-streamlit
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
     ports:
       - "8501:8501"
     env_file:
@@ -9,3 +36,5 @@ services:
     volumes:
       - ./:/app
     restart: unless-stopped
+    depends_on:
+      - backend

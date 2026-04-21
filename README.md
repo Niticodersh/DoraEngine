@@ -55,7 +55,9 @@ DoraEngine is an advanced AI-powered research assistant that autonomously resear
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 20+ (for frontend)
 - [Groq API Key](https://console.groq.com/) (required)
+- MongoDB Database (required for backend auth and history)
 - [Tavily API Key](https://tavily.com/) (optional, improves search quality)
 
 ### Installation
@@ -71,86 +73,99 @@ DoraEngine is an advanced AI-powered research assistant that autonomously resear
    # Copy environment template
    cp .env.example .env
 
-   # Edit .env and add your API keys
+   # Edit .env and add your API keys and MongoDB configuration
    # GROQ_API_KEY=your_groq_api_key_here
+   # AUTH_SECRET_KEY=your_auth_secret_key
+   # MONGODB_URI=your_mongodb_uri
+   # MONGODB_DB_NAME=doraengine
    # TAVILY_API_KEY=your_tavily_api_key_here
    ```
 
-3. **Install dependencies**
+## 🏃 Running the Application
+
+DoraEngine supports two architectures: our new, production-ready decoupled setup (React + FastAPI) and our original monolithic Streamlit application.
+
+### Option 1: Decoupled Architecture (Recommended)
+
+Our new architecture features a React/Vite frontend and a FastAPI backend with MongoDB for authentication, plans, user API keys, and chat history.
+
+1. **Start the Backend API**
    ```bash
+   # Create and activate virtual environment
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   
+   # Install dependencies
    pip install -r requirements.txt
+   
+   # Run the FastAPI server
+   python -m uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
    ```
 
-4. **Run the application**
+2. **Start the Frontend** (in a new terminal)
    ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **Access the Application**
+   - Frontend Client: `http://localhost:5173`
+   - Backend API Docs: `http://localhost:8000/docs`
+
+### Option 2: Streamlit Application (Original)
+
+If you prefer the original, lightweight Streamlit-only setup:
+
+1. **Set up Python environment and run**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   
    streamlit run app.py
    ```
 
-5. **Open your browser**
+2. **Access the Application**
    - Navigate to `http://localhost:8501`
-   - Start researching!
-
-## React + API App
-
-The repo now also supports a decoupled frontend/backend setup:
-
-- `api/server.py`: FastAPI backend exposing research, follow-ups, graph, and PDF export endpoints
-- `frontend/`: React + Vite client that mirrors the Streamlit research experience
-- MongoDB-backed auth, plans, profile API keys, and saved chat history
-- PDF and Word export with free-plan watermarking
-
-### Run the backend
-
-```bash
-python -m uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
-```
-
-Before starting the backend, set these in `.env`:
-
-```bash
-GROQ_API_KEY=...
-AUTH_SECRET_KEY=...
-MONGODB_URI=...
-MONGODB_DB_NAME=doraengine
-TAVILY_API_KEY=... # optional
-```
-
-### Run the React frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Then open:
-
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
 
 ## 🐳 Docker Deployment
 
+We provide a comprehensive Docker Compose configuration to easily spin up all services simultaneously.
+
 ### Using Docker Compose (Recommended)
 
+The provided `docker-compose.yml` will orchestrate the FastAPI backend, the Vite frontend, and the Streamlit app.
+
 ```bash
-# Build and run
+# Build and run all services
 docker-compose up --build
 
 # Run in background
 docker-compose up -d --build
 
-# Stop
+# View logs
+docker-compose logs -f
+
+# Stop all services
 docker-compose down
 ```
 
-### Using Docker Directly
+Once running, the services will be available at:
+- **Frontend App**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8000`
+- **Streamlit App**: `http://localhost:8501`
+
+### Running Individual Services using Docker Compose
+
+If you only want to run specific services, you can specify them:
 
 ```bash
-# Build image
-docker build -t doraengine .
+# Run only the new decoupled architecture
+docker-compose up backend frontend
 
-# Run container
-docker run -p 8501:8501 --env-file .env -v $(pwd):/app doraengine
+# Run only the Streamlit app
+docker-compose up streamlit
 ```
 
 ## 📁 Project Structure
