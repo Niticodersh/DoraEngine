@@ -1,30 +1,22 @@
-"""Configuration helpers shared across Streamlit and API entry points."""
+"""Configuration helpers for the API server.
+
+Environment variables take priority. Falls back to `default` if the var is not set.
+Streamlit's secrets API is no longer used — the API server is a standalone FastAPI
+process where env vars are the only secret source.
+"""
 from __future__ import annotations
 
 import os
 
 # Load .env file into environment variables at import time.
-# This ensures MONGODB_URI, AUTH_SECRET_KEY, etc. are available when running
-# the backend with uvicorn (which does not auto-load .env files).
+# On Render / production env vars are injected directly; .env is ignored.
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # dotenv not installed — rely on environment variables being set externally
+    pass  # python-dotenv not installed — rely on env vars set externally
 
 
 def get_secret(name: str, default: str = "") -> str:
-    env_value = os.getenv(name, "")
-    if env_value:
-        return env_value
-
-    try:
-        import streamlit as st
-
-        value = st.secrets.get(name)
-        if value:
-            return value
-    except Exception:
-        pass
-
-    return default
+    """Return the value of *name* from the environment, or *default*."""
+    return os.getenv(name, default)

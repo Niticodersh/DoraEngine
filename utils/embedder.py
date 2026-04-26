@@ -1,21 +1,29 @@
 """
 Embedder — singleton sentence-transformers model for chunk embedding.
+
+All heavy imports (SentenceTransformer / torch) are deferred to first call
+so the FastAPI server can start without loading ~2 GB of ML weights into RAM.
 """
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
+
 warnings.filterwarnings("ignore", category=ImportWarning, module="transformers.*")
 
 import numpy as np
-# from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity as _cosine_sim
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
-_embedder_instance: SentenceTransformer | None = None
-
-
-def _get_model():
+if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
+
+_MODEL_NAME = "all-MiniLM-L6-v2"
+_embedder_instance: "SentenceTransformer | None" = None
+
+
+def _get_model() -> "SentenceTransformer":
+    """Lazy-load the embedding model on first call."""
+    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
     global _embedder_instance
     if _embedder_instance is None:
         _embedder_instance = SentenceTransformer(_MODEL_NAME)
@@ -31,7 +39,7 @@ def embed(texts: list[str]) -> np.ndarray:
 
 
 def embed_single(text: str) -> np.ndarray:
-    """Embed a single string → 1-D numpy array."""
+    """Embed a single string -> 1-D numpy array."""
     return embed([text])[0]
 
 

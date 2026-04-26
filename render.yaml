@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: doraengine-api
+    runtime: python
+    region: singapore
+    plan: free
+
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+
+    # $PORT is injected by Render automatically (always 10000 on free tier).
+    # We hardcode 0.0.0.0 so Render's port scanner can detect the open port.
+    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /api/health
+
+    envVars:
+      # ── Required secrets — set these in Render dashboard ─────────────────
+      - key: MONGODB_URI
+        sync: false          # set manually in Render dashboard
+
+      - key: MONGODB_DB_NAME
+        value: doraengine
+
+      - key: AUTH_SECRET_KEY
+        generateValue: true  # Render auto-generates a secure random value
+
+      - key: GROQ_API_KEY
+        sync: false          # platform-managed key for paid plan users
+
+      - key: RAZORPAY_KEY_ID
+        sync: false
+
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+      - key: GMAIL_USER
+        sync: false          # optional — enables real OTP / reset emails
+
+      - key: GMAIL_APP_PASSWORD
+        sync: false          # optional — Gmail app password for SMTP
+
+      # ── Python / runtime behaviour ─────────────────────────────────────
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
+      # Suppress noisy Python warnings in logs
+      - key: PYTHONWARNINGS
+        value: "ignore"
+
+      # Disable HuggingFace progress bars in logs
+      - key: TRANSFORMERS_VERBOSITY
+        value: error
+
+      # Keep model cache inside Render's ephemeral disk (avoids re-download overhead)
+      - key: HF_HOME
+        value: /opt/render/project/src/.cache/huggingface

@@ -32,15 +32,6 @@ def ensure_api_key(groq_api_key: str | None = None, requires_user_key: bool = Fa
         raise RuntimeError("Your current plan requires adding a GROQ API key in profile before running research")
     if os.getenv("GROQ_API_KEY"):
         return
-
-    try:
-        import streamlit as st
-
-        if st.secrets.get("GROQ_API_KEY"):
-            return
-    except Exception:
-        pass
-
     raise RuntimeError("GROQ_API_KEY not set")
 
 
