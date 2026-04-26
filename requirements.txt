@@ -73,8 +73,8 @@ filelock==3.25.2
 fsspec==2026.3.0
 packaging==24.2
 regex==2026.4.4
-sympy==1.14.0
-mpmath==1.3.0
+sympy==1.13.1
+mpmath>=1.3.0
 
 # ── LangGraph pipeline ─────────────────────────────────────────────────────────
 langgraph==0.2.50
