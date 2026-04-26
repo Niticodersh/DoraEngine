@@ -1,8 +1,8 @@
 """
-Embedder — singleton sentence-transformers model for chunk embedding.
+Embedder — singleton fastembed model for chunk embedding.
 
-All heavy imports (SentenceTransformer / torch) are deferred to first call
-so the FastAPI server can start without loading ~2 GB of ML weights into RAM.
+Uses ONNX runtime instead of PyTorch to keep memory footprint under ~150MB.
+Imports are still deferred to avoid slowing down FastAPI startup.
 """
 from __future__ import annotations
 
@@ -15,18 +15,18 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity as _cosine_sim
 
 if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer
+    from fastembed import TextEmbedding
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
-_embedder_instance: "SentenceTransformer | None" = None
+_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+_embedder_instance: "TextEmbedding | None" = None
 
 
-def _get_model() -> "SentenceTransformer":
+def _get_model() -> "TextEmbedding":
     """Lazy-load the embedding model on first call."""
-    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+    from fastembed import TextEmbedding  # noqa: PLC0415
     global _embedder_instance
     if _embedder_instance is None:
-        _embedder_instance = SentenceTransformer(_MODEL_NAME)
+        _embedder_instance = TextEmbedding(_MODEL_NAME)
     return _embedder_instance
 
 
@@ -35,7 +35,8 @@ def embed(texts: list[str]) -> np.ndarray:
     Returns a 2-D numpy array of shape (len(texts), embedding_dim).
     """
     model = _get_model()
-    return model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+    # fastembed returns a generator of numpy arrays, convert to a single 2D array
+    return np.array(list(model.embed(texts)))
 
 
 def embed_single(text: str) -> np.ndarray:
