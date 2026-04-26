@@ -17,7 +17,7 @@ load_env = __import__("dotenv").load_dotenv
 load_env()
 
 # _MAX_CONCURRENT = int(os.getenv("MAX_SCRAPE_CONCURRENT", "8"))
-_MAX_CONCURRENT = 8
+_MAX_CONCURRENT = 3
 # _TIMEOUT        = int(os.getenv("SCRAPE_TIMEOUT", "15"))
 _TIMEOUT        = 15
 _MIN_CONTENT    = 200   # minimum characters to consider a scrape successful

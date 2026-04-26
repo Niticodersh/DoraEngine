@@ -131,7 +131,7 @@ def node_search(state: PipelineState) -> PipelineState:
 def node_scrape(state: PipelineState) -> PipelineState:
     t0      = time.time()
     results = state.get("search_results", [])
-    urls    = [r.url for r in results][:25]  # Limit to 25 URLs to scrape
+    urls    = [r.url for r in results][:12]  # Limit to 12 URLs to prevent OOM
     _log(state, "ScraperAgent", "Scraping sources",
          f"Scraping {len(urls)} URLs in parallel")
 
